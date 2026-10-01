@@ -9,14 +9,14 @@ binding = "ASSETS"
 [[d1_databases]]
 binding = "DB"
 database_name = "nxt-ads"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "1b3f2763-d62c-4a78-af62-293e126b3f4c"
 migrations_dir = "migrations"
 
 [vars]
 NXT_PLATFORM_FEE_BPS = "1200"
 APP_NAME = "NXT ADS"
 
-# Add production credentials with:
+# Production credentials belong in Cloudflare Worker Secrets, never GitHub.
 # npx wrangler secret put STRIPE_SECRET_KEY
 # npx wrangler secret put AI_API_KEY
 # npx wrangler secret put GOOGLE_CLIENT_ID
