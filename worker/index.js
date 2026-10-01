@@ -11,7 +11,20 @@ function feeFor(budgetCents, env) {
   return Math.round(budgetCents * bps / 10000);
 }
 
-async function requireDb(env) {
+async function ensureSchema(env) {
+  await env.DB.batch([
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT UNIQUE, name TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS ad_accounts (id TEXT PRIMARY KEY, user_id TEXT, provider TEXT NOT NULL, external_id TEXT, access_token TEXT, refresh_token TEXT, status TEXT DEFAULT 'connected', created_at TEXT DEFAULT CURRENT_TIMESTAMP)`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS campaigns (id TEXT PRIMARY KEY, user_id TEXT, name TEXT NOT NULL, objective TEXT, status TEXT DEFAULT 'draft', budget_cents INTEGER DEFAULT 0, fee_cents INTEGER DEFAULT 0, currency TEXT DEFAULT 'USD', start_date TEXT, end_date TEXT, providers TEXT, target_audience TEXT, website_url TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP, updated_at TEXT DEFAULT CURRENT_TIMESTAMP)`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS ads (id TEXT PRIMARY KEY, campaign_id TEXT, provider TEXT, headline TEXT, description TEXT, cta TEXT, image_url TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS payments (id TEXT PRIMARY KEY, user_id TEXT, campaign_id TEXT, provider TEXT, amount_cents INTEGER DEFAULT 0, fee_cents INTEGER DEFAULT 0, status TEXT DEFAULT 'pending', external_id TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS performance_daily (id TEXT PRIMARY KEY, campaign_id TEXT, provider TEXT, day TEXT, spend_cents INTEGER DEFAULT 0, impressions INTEGER DEFAULT 0, clicks INTEGER DEFAULT 0, conversions INTEGER DEFAULT 0, revenue_cents INTEGER DEFAULT 0)`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS ai_generations (id TEXT PRIMARY KEY, user_id TEXT, campaign_id TEXT, prompt TEXT, output TEXT, provider TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)`),
+    env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_campaigns_user ON campaigns(user_id)`),
+    env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_accounts_user ON ad_accounts(user_id)`),
+    env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_perf_campaign_day ON performance_daily(campaign_id, day)`)
+  ]);
+}\n\nasync function requireDb(env) {
   if (!env.DB) throw new Error("D1 is not configured. Add a database binding in wrangler.toml.");
 }
 
