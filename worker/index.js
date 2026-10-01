@@ -74,11 +74,13 @@ function sessionResponse(data, token, request) {
 }
 async function oauthStart(provider, kind, request, env) {
   await requireDb(env);
+  let connectUser=null;
+  if(kind==="connect") connectUser=await requireUser(request,env);
   const cfg=PROVIDERS[provider];
   const clientId=env[cfg.clientIdSecret];
   if(!clientId) return json({error:`Missing ${cfg.clientIdSecret}`},503);
   const state=id("oauth");
-  await env.DB.prepare("INSERT INTO oauth_states (state,provider,kind,expires_at) VALUES (?,?,?,?)").bind(state,provider,kind,Math.floor(Date.now()/1000)+600).run();
+  await env.DB.prepare("INSERT INTO oauth_states (state,provider,kind,expires_at) VALUES (?,?,?,?)").bind(state,connectUser?.id||null,provider,kind,Math.floor(Date.now()/1000)+600).run();
   const redirect=new URL(request.url); redirect.pathname=`/api/oauth/${provider}/callback`; redirect.search="";
   const u=new URL(cfg.oauth); u.searchParams.set("client_id",clientId); u.searchParams.set("redirect_uri",redirect.toString()); u.searchParams.set("response_type","code"); u.searchParams.set("state",state); u.searchParams.set("scope",cfg.scopes.join(" "));
   return Response.redirect(u.toString(),302);
@@ -99,15 +101,33 @@ async function oauthCallback(provider, request, env) {
   let identity={email:null,name:null};
   if(provider==="google"){const r=await fetch("https://openidconnect.googleapis.com/v1/userinfo",{headers:{authorization:"Bearer "+access}});if(r.ok){const x=await r.json();identity={email:x.email,name:x.name}}}
   else if(provider==="microsoft"){const r=await fetch("https://graph.microsoft.com/v1.0/me",{headers:{authorization:"Bearer "+access}});if(r.ok){const x=await r.json();identity={email:x.mail||x.userPrincipalName,name:x.displayName}}}
-  const email=identity.email||`${provider}_${id()}@oauth.nxtads.local`;
-  const uid=id("usr");
-  await env.DB.prepare("INSERT INTO users (id,email,name) VALUES (?,?,?) ON CONFLICT(email) DO UPDATE SET name=excluded.name").bind(uid,email,identity.name||provider).run();
-  const user=await env.DB.prepare("SELECT * FROM users WHERE email=?").bind(email).first();
-  await env.DB.prepare("INSERT INTO ad_accounts (id,user_id,provider,access_token,refresh_token,token_expires_at,status) VALUES (?,?,?,?,?,?,?)").bind(id("acct"),user.id,provider,access,td.refresh_token||null,td.expires_in?new Date(Date.now()+td.expires_in*1000).toISOString():null,"connected").run();
-  const token=await makeSession(user.id,env);
-  return sessionResponse({ok:true,user:{id:user.id,email:user.email,name:user.name},provider},token,request);
+  let user=null;
+  if(st.kind==="connect"){
+    user=await currentUser(request,env);
+    if(!user || user.id!==st.user_id) return json({error:"Connection session expired. Please start again."},401);
+  } else {
+    const email=provider+"_"+id()+"@oauth.nxtads.local";
+    if(identity.email) { user=await env.DB.prepare("SELECT * FROM users WHERE email=?").bind(identity.email).first(); }
+    if(!user){
+      await env.DB.prepare("INSERT INTO users (id,email,name) VALUES (?,?,?)").bind(id("usr"),identity.email||email,identity.name||provider).run();
+      user=await env.DB.prepare("SELECT * FROM users WHERE email=?").bind(identity.email||email).first();
+    }
+  }
+  const accessStored=await encryptToken(access,env), refreshStored=await encryptToken(td.refresh_token||null,env);
+  await env.DB.prepare("INSERT INTO ad_accounts (id,user_id,provider,access_token,refresh_token,token_expires_at,status) VALUES (?,?,?,?,?,?,?)").bind(id("acct"),user.id,provider,accessStored,refreshStored,td.expires_in?new Date(Date.now()+td.expires_in*1000).toISOString():null,"connected").run();
+  const token=st.kind==="login"?await makeSession(user.id,env):null;
+  return sessionResponse({ok:true,user:{id:user.id,email:user.email,name:user.name},provider,connected:true},token,request);
 }
 
+async function encryptToken(value,env){
+  if(!value) return null;
+  if(!env.TOKEN_ENCRYPTION_KEY) throw new Error("TOKEN_ENCRYPTION_KEY is required before connecting an ad account");
+  const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(env.TOKEN_ENCRYPTION_KEY));
+  const key=await crypto.subtle.importKey("raw",digest,{name:"AES-GCM"},false,["encrypt"]);
+  const iv=crypto.getRandomValues(new Uint8Array(12));
+  const data=await crypto.subtle.encrypt({name:"AES-GCM",iv},key,new TextEncoder().encode(value));
+  return "enc:v1:"+b64(iv)+":"+b64(data);
+}
 async function aiGenerate(body, env) {
   if (!env.AI_API_KEY) {
     return {
@@ -258,11 +278,8 @@ export default {
         return json({id:adId});
       }
 
-      if (path === "/api/providers/connect") {
-        const provider = url.searchParams.get("provider");
-        if (!PROVIDERS[provider]) return json({error:"Unsupported provider"},400);
-        return json({ provider, configured: providerStatus(env).find(x=>x.id===provider)?.configured || false, message:"OAuth callback integration is ready for provider credentials." });
-      }
+      const connectMatch=path.match(/^\/api\/providers\/([^/]+)\/connect$/);
+      if(connectMatch && request.method==="GET" && PROVIDERS[connectMatch[1]]) return await oauthStart(connectMatch[1],"connect",request,env);
 
       if (path.startsWith("/api/")) return json({error:"Not found"},404);
       return env.ASSETS.fetch(request);
