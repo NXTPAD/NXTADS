@@ -128,6 +128,33 @@ async function encryptToken(value,env){
   const data=await crypto.subtle.encrypt({name:"AES-GCM",iv},key,new TextEncoder().encode(value));
   return "enc:v1:"+b64(iv)+":"+b64(data);
 }
+async function decryptToken(value,env){
+  if(!value) return null;
+  if(!value.startsWith("enc:v1:")) return null;
+  if(!env.TOKEN_ENCRYPTION_KEY) throw new Error("TOKEN_ENCRYPTION_KEY is not configured");
+  const [,v,iv64,data64]=value.split(":");
+  const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(env.TOKEN_ENCRYPTION_KEY));
+  const key=await crypto.subtle.importKey("raw",digest,{name:"AES-GCM"},false,["decrypt"]);
+  const plain=await crypto.subtle.decrypt({name:"AES-GCM",iv:unb64(iv64)},key,unb64(data64));
+  return new TextDecoder().decode(plain);
+}
+async function discoverGoogleAccounts(user,env){
+  if(!env.GOOGLE_DEVELOPER_TOKEN) return [];
+  const account=await env.DB.prepare("SELECT * FROM ad_accounts WHERE user_id=? AND provider='google' ORDER BY created_at DESC LIMIT 1").bind(user.id).first();
+  if(!account) return [];
+  const access=await decryptToken(account.access_token,env);
+  if(!access) return [];
+  const r=await fetch("https://googleads.googleapis.com/v25/customers:listAccessibleCustomers",{headers:{authorization:"Bearer "+access,"developer-token":env.GOOGLE_DEVELOPER_TOKEN}});
+  const data=await r.json();
+  if(!r.ok) throw new Error("Google Ads account discovery failed: "+JSON.stringify(data).slice(0,500));
+  const ids=(data.resourceNames||[]).map(x=>x.split("/").pop()).filter(Boolean);
+  for(const externalId of ids){
+    const exists=await env.DB.prepare("SELECT id FROM ad_accounts WHERE user_id=? AND provider='google' AND external_id=?").bind(user.id,externalId).first();
+    if(exists) await env.DB.prepare("UPDATE ad_accounts SET status='connected' WHERE id=?").bind(exists.id).run();
+    else await env.DB.prepare("INSERT INTO ad_accounts (id,user_id,provider,external_id,account_name,status) VALUES (?,?,?,?,?,?)").bind(id("acct"),user.id,"google",externalId,"Google Ads "+externalId,"connected").run();
+  }
+  return ids;
+}
 async function aiGenerate(body, env) {
   if (!env.AI_API_KEY) {
     return {
@@ -232,6 +259,12 @@ export default {
       if(authMatch && request.method==="GET" && PROVIDERS[authMatch[1]]) return await oauthStart(authMatch[1],"login",request,env);
       const cbMatch=path.match(/^\/api\/oauth\/([a-z]+)\/callback$/);
       if(cbMatch && request.method==="GET" && PROVIDERS[cbMatch[1]]) return await oauthCallback(cbMatch[1],request,env);
+      if(path==="/api/accounts" && request.method==="GET"){
+        await requireDb(env); const user=await requireUser(request,env);
+        try{await discoverGoogleAccounts(user,env)}catch(e){return json({accounts:[],error:e.message},502)}
+        const r=await env.DB.prepare("SELECT id,provider,external_id,account_name,status,token_expires_at,created_at FROM ad_accounts WHERE user_id=? ORDER BY created_at DESC").bind(user.id).all();
+        return json({accounts:r.results||[]});
+      }
       if(path==="/api/auth/me"){ await requireDb(env); const user=await currentUser(request,env); return json({authenticated:!!user,user:user?{id:user.id,email:user.email,name:user.name}:null}); }
       if(path==="/api/auth/logout" && request.method==="POST"){ const h={"content-type":"application/json; charset=utf-8","set-cookie":"nxt_session=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0"}; return new Response(JSON.stringify({ok:true}),{headers:h}); }
 
