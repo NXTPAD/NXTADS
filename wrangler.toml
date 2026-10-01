@@ -1,0 +1,33 @@
+name = "nxt-ads"
+main = "worker/index.js"
+compatibility_date = "2026-10-01"
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "nxt-ads"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+migrations_dir = "migrations"
+
+[vars]
+NXT_PLATFORM_FEE_BPS = "1200"
+APP_NAME = "NXT ADS"
+
+# Add production credentials with:
+# npx wrangler secret put STRIPE_SECRET_KEY
+# npx wrangler secret put AI_API_KEY
+# npx wrangler secret put GOOGLE_CLIENT_ID
+# npx wrangler secret put GOOGLE_CLIENT_SECRET
+# npx wrangler secret put GOOGLE_DEVELOPER_TOKEN
+# npx wrangler secret put MICROSOFT_CLIENT_ID
+# npx wrangler secret put MICROSOFT_CLIENT_SECRET
+# npx wrangler secret put MICROSOFT_DEVELOPER_TOKEN
+# npx wrangler secret put META_APP_ID
+# npx wrangler secret put META_APP_SECRET
+# npx wrangler secret put TIKTOK_CLIENT_KEY
+# npx wrangler secret put TIKTOK_CLIENT_SECRET
+# npx wrangler secret put LINKEDIN_CLIENT_ID
+# npx wrangler secret put LINKEDIN_CLIENT_SECRET
