@@ -12,6 +12,9 @@ database_name = "nxt-ads"
 database_id = "1b3f2763-d62c-4a78-af62-293e126b3f4c"
 migrations_dir = "migrations"
 
+[secrets]
+required = ["AUTH_SECRET", "TOKEN_ENCRYPTION_KEY"]
+
 [vars]
 NXT_PLATFORM_FEE_BPS = "1200"
 APP_NAME = "NXT ADS"
