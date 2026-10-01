@@ -82,7 +82,7 @@ async function oauthStart(provider, kind, request, env) {
   const state=id("oauth");
   await env.DB.prepare("INSERT INTO oauth_states (state,provider,kind,expires_at) VALUES (?,?,?,?)").bind(state,connectUser?.id||null,provider,kind,Math.floor(Date.now()/1000)+600).run();
   const redirect=new URL(request.url); redirect.pathname=`/api/oauth/${provider}/callback`; redirect.search="";
-  const u=new URL(cfg.oauth); u.searchParams.set("client_id",clientId); u.searchParams.set("redirect_uri",redirect.toString()); u.searchParams.set("response_type","code"); u.searchParams.set("state",state); u.searchParams.set("scope",cfg.scopes.join(" "));
+  const u=new URL(cfg.oauth); u.searchParams.set("client_id",clientId); u.searchParams.set("redirect_uri",redirect.toString()); u.searchParams.set("response_type","code"); u.searchParams.set("state",state); u.searchParams.set("scope",(kind==="login" && provider==="google" ? ["openid","email","profile"] : cfg.scopes).join(" "));
   return Response.redirect(u.toString(),302);
 }
 async function oauthCallback(provider, request, env) {
@@ -113,10 +113,12 @@ async function oauthCallback(provider, request, env) {
       user=await env.DB.prepare("SELECT * FROM users WHERE email=?").bind(identity.email||email).first();
     }
   }
-  const accessStored=await encryptToken(access,env), refreshStored=await encryptToken(td.refresh_token||null,env);
-  await env.DB.prepare("INSERT INTO ad_accounts (id,user_id,provider,access_token,refresh_token,token_expires_at,status) VALUES (?,?,?,?,?,?,?)").bind(id("acct"),user.id,provider,accessStored,refreshStored,td.expires_in?new Date(Date.now()+td.expires_in*1000).toISOString():null,"connected").run();
+  if(st.kind==="connect"){
+    const accessStored=await encryptToken(access,env), refreshStored=await encryptToken(td.refresh_token||null,env);
+    await env.DB.prepare("INSERT INTO ad_accounts (id,user_id,provider,access_token,refresh_token,token_expires_at,status) VALUES (?,?,?,?,?,?,?)").bind(id("acct"),user.id,provider,accessStored,refreshStored,td.expires_in?new Date(Date.now()+td.expires_in*1000).toISOString():null,"connected").run();
+  }
   const token=st.kind==="login"?await makeSession(user.id,env):null;
-  return sessionResponse({ok:true,user:{id:user.id,email:user.email,name:user.name},provider,connected:true},token,request);
+  return sessionResponse({ok:true,user:{id:user.id,email:user.email,name:user.name},provider,connected:st.kind==="connect"},token,request);
 }
 
 async function encryptToken(value,env){
@@ -174,7 +176,7 @@ async function googleApi(path,access,env,body){
 }
 async function publishGoogleCampaign(user,campaign,ad,account,env){
   if(!env.GOOGLE_DEVELOPER_TOKEN) throw new Error("GOOGLE_DEVELOPER_TOKEN is not configured");
-  const access=await decryptToken(account.access_token,env); if(!access) throw new Error("Google Ads account token is unavailable");
+  const access=await getGoogleAccess(account,env); if(!access) throw new Error("Google Ads account token is unavailable");
   const cid=account.external_id;
   if(!/^\d{6,20}$/.test(String(cid))) throw new Error("Invalid Google Ads customer ID");
   const daily=Math.max(500000,Math.round((Number(campaign.budget_cents||0)/30)*10000));
@@ -267,13 +269,14 @@ async function stripeCheckout(body, env) {
 async function stripeWebhook(request,env){
   if(!env.STRIPE_WEBHOOK_SECRET) return json({error:"Stripe webhook secret is not configured"},503);
   const sig=request.headers.get("Stripe-Signature")||"", raw=await request.text();
-  const parts=Object.fromEntries(sig.split(",").map(x=>x.split("=").map(v=>v.trim())));
-  const ts=Number(parts.t), v1=parts.v1;
-  if(!ts||!v1||Math.abs(Date.now()/1000-ts)>300) return json({error:"Invalid webhook timestamp"},400);
+  const pairs=sig.split(",").map(x=>x.split("=",2).map(v=>v.trim()));
+  const timestamp=Number(pairs.find(([k])=>k==="t")?.[1]);
+  const signatures=pairs.filter(([k])=>k==="v1").map(([,v])=>v);
+  if(!timestamp||!signatures.length||Math.abs(Date.now()/1000-timestamp)>300) return json({error:"Invalid webhook timestamp"},400);
   const key=await crypto.subtle.importKey("raw",new TextEncoder().encode(env.STRIPE_WEBHOOK_SECRET),{name:"HMAC",hash:"SHA-256"},false,["verify"]);
-  const expected=new Uint8Array(await crypto.subtle.sign("HMAC",key,new TextEncoder().encode(ts+"."+raw)));
-  const hex=Array.from(expected).map(x=>x.toString(16).padStart(2,"0")).join("");
-  if(hex!==v1) return json({error:"Invalid webhook signature"},400);
+  const expected=await crypto.subtle.sign("HMAC",key,new TextEncoder().encode(timestamp+"."+raw));
+  const hex=Array.from(new Uint8Array(expected)).map(x=>x.toString(16).padStart(2,"0")).join("");
+  if(!signatures.includes(hex)) return json({error:"Invalid webhook signature"},400);
   const event=JSON.parse(raw), obj=event.data?.object||{};
   const paymentId=obj.metadata?.payment_id;
   if(paymentId){
@@ -324,6 +327,7 @@ export default {
       if(path==="/api/auth/logout" && request.method==="POST"){ const h={"content-type":"application/json; charset=utf-8","set-cookie":"nxt_session=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0"}; return new Response(JSON.stringify({ok:true}),{headers:h}); }
 
       if (path === "/api/ai/generate" && request.method === "POST") {
+        await requireDb(env); await requireUser(request,env);
         return json(await aiGenerate(await request.json(), env));
       }
 
@@ -377,6 +381,9 @@ export default {
       if (path === "/api/ads" && request.method === "POST") {
         await requireDb(env);
         const b=await request.json();
+        const user=await requireUser(request,env);
+        const campaign=await env.DB.prepare("SELECT id FROM campaigns WHERE id=? AND user_id=?").bind(b.campaign_id,user.id).first();
+        if(!campaign) return json({error:"Campaign not found"},404);
         const adId=id("ad");
         await env.DB.prepare("INSERT INTO ads (id,campaign_id,provider,headline,description,cta,image_url) VALUES (?,?,?,?,?,?,?)")
           .bind(adId,b.campaign_id,b.provider||null,b.headline||"",b.description||"",b.cta||"Learn More",b.image_url||null).run();
