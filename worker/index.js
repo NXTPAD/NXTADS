@@ -155,6 +155,36 @@ async function discoverGoogleAccounts(user,env){
   }
   return ids;
 }
+async function googleApi(path,access,env,body){
+  const headers={"content-type":"application/json","authorization:"+" Bearer "+access,"developer-token":env.GOOGLE_DEVELOPER_TOKEN};
+  if(env.GOOGLE_LOGIN_CUSTOMER_ID) headers["login-customer-id"]=String(env.GOOGLE_LOGIN_CUSTOMER_ID).replaceAll("-","");
+  const r=await fetch("https://googleads.googleapis.com/v25"+path,{method:"POST",headers,body:JSON.stringify(body)});
+  const data=await r.json(); if(!r.ok) throw new Error("Google Ads API "+r.status+": "+JSON.stringify(data).slice(0,900)); return data;
+}
+async function publishGoogleCampaign(user,campaign,ad,account,env){
+  if(!env.GOOGLE_DEVELOPER_TOKEN) throw new Error("GOOGLE_DEVELOPER_TOKEN is not configured");
+  const access=await decryptToken(account.access_token,env); if(!access) throw new Error("Google Ads account token is unavailable");
+  const cid=account.external_id;
+  if(!/^\d{6,20}$/.test(String(cid))) throw new Error("Invalid Google Ads customer ID");
+  const daily=Math.max(500000,Math.round((Number(campaign.budget_cents||0)/30)*10000));
+  const budget=await googleApi(`/customers/${cid}/campaignBudgets:mutate`,access,env,{operations:[{create:{name:"NXT ADS Budget "+campaign.id,deliveryMethod:"STANDARD",amountMicros:String(daily),explicitlyShared:false}}]});
+  const budgetResource=budget.results?.[0]?.resourceName; if(!budgetResource) throw new Error("Google Ads did not return a budget resource");
+  const camp=await googleApi(`/customers/${cid}/campaigns:mutate`,access,env,{operations:[{create:{name:campaign.name,advertisingChannelType:"SEARCH",status:"PAUSED",manualCpc:{},campaignBudget:budgetResource,networkSettings:{targetGoogleSearch:true,targetSearchNetwork:true,targetContentNetwork:false,targetPartnerSearchNetwork:false}}}]});
+  const campaignResource=camp.results?.[0]?.resourceName; if(!campaignResource) throw new Error("Google Ads did not return a campaign resource");
+  const group=await googleApi(`/customers/${cid}/adGroups:mutate`,access,env,{operations:[{create:{name:campaign.name+" Ad Group",status:"PAUSED",campaign:campaignResource,type:"SEARCH_STANDARD"}}]});
+  const groupResource=group.results?.[0]?.resourceName; if(!groupResource) throw new Error("Google Ads did not return an ad group resource");
+  const headline=(ad?.headline||campaign.name||"Discover our offer").slice(0,30);
+  const description=(ad?.description||"Learn more about our offer and get started today.").slice(0,90);
+  const second=(ad?.cta||"Get Started").slice(0,30);
+  const third=(campaign.objective||"Grow your business").slice(0,30);
+  const finalUrl=campaign.website_url; if(!/^https?:\/\//i.test(finalUrl||"")) throw new Error("A valid campaign website URL is required");
+  const adResp=await googleApi(`/customers/${cid}/adGroupAds:mutate`,access,env,{operations:[{create:{status:"PAUSED",adGroup:groupResource,ad:{finalUrls:[finalUrl],responsiveSearchAd:{headlines:[{text:headline},{text:second},{text:third}],descriptions:[{text:description},{text:(description+" "+second).slice(0,90)}]}}}}]});
+  const keyword=((campaign.target_audience||campaign.name||"business").toLowerCase().replace(/[^a-z0-9 ]/g," ").trim().split(/\s+/).filter(Boolean).slice(0,4).join(" ")||"business");
+  await googleApi(`/customers/${cid}/adGroupCriteria:mutate`,access,env,{operations:[{create:{adGroup:groupResource,status:"PAUSED,keyword:{text:keyword,matchType:"BROAD"}}}]});
+  const externalId=campaignResource.split("/").pop();
+  await env.DB.prepare("UPDATE campaigns SET status='connected',providers=? WHERE id=?").bind(JSON.stringify([{provider:"google",customer_id:cid,external_id:externalId}]),campaign.id).run();
+  return {provider:"google",customer_id:cid,campaign_resource:campaignResource,ad_group_resource:groupResource};
+}
 async function aiGenerate(body, env) {
   if (!env.AI_API_KEY) {
     return {
@@ -300,6 +330,20 @@ export default {
         await env.DB.prepare(`INSERT INTO campaigns (id,user_id,name,objective,status,budget_cents,fee_cents,currency,start_date,end_date,providers,target_audience,website_url) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`)
           .bind(campaignId,user.id,b.name||"Untitled Campaign",b.objective||"sales","draft",budget,fee,"USD",b.start_date||null,b.end_date||null,JSON.stringify(b.providers||[]),b.audience||"",b.website_url||null).run();
         return json({ id:campaignId, fee_cents:fee, total_cents:budget+fee });
+      }
+
+      const publishMatch=path.match(/^\/api\/campaigns\/([^/]+)\/publish$/);
+      if(publishMatch && request.method==="POST"){
+        await requireDb(env); const user=await requireUser(request,env), cid=publishMatch[1], body=await request.json();
+        const campaign=await env.DB.prepare("SELECT * FROM campaigns WHERE id=? AND user_id=?").bind(cid,user.id).first();
+        if(!campaign) return json({error:"Campaign not found"},404);
+        const provider=body.provider||"google";
+        if(provider!=="google") return json({error:"This provider adapter is being enabled next; campaign remains safely in draft."},501);
+        const account=await env.DB.prepare("SELECT * FROM ad_accounts WHERE id=? AND user_id=? AND provider='google'").bind(body.ad_account_id,user.id).first();
+        if(!account) return json({error:"Select a connected Google Ads account"},400);
+        const ad=await env.DB.prepare("SELECT * FROM ads WHERE campaign_id=? ORDER BY created_at DESC LIMIT 1").bind(cid).first();
+        if(!ad) return json({error:"Create an ad creative before publishing"},400);
+        try{return json(await publishGoogleCampaign(user,campaign,ad,account,env))}catch(e){await env.DB.prepare("UPDATE campaigns SET status='error' WHERE id=?").bind(cid).run();throw e}
       }
 
       if (path === "/api/ads" && request.method === "POST") {
