@@ -239,33 +239,30 @@ async function aiGenerate(body, env) {
 
 async function stripeCheckout(body, env) {
   const budget=Math.max(100,Number(body.amount_cents||0));
-  const fee=feeFor(budget,env), total=budget+fee;
-  if (!env.STRIPE_SECRET_KEY) return {demo:true,budget_cents:budget,fee_cents:fee,total_cents:total,message:"Stripe is not configured yet."};
+  const fee=feeFor(budget,env);
+  if(!env.STRIPE_SECRET_KEY) return {demo:true,ad_budget_cents:budget,fee_cents:fee,total_platform_charge_cents:fee,message:"Stripe is not configured yet. The advertising budget is paid through the connected ad network; NXT charges the platform fee."};
   await requireDb(env);
   const paymentId=id("pay");
   await env.DB.prepare("INSERT INTO payments (id,user_id,campaign_id,amount_cents,fee_cents,ad_budget_cents,currency,status) VALUES (?,?,?,?,?,?,?,'pending')")
-    .bind(paymentId,body.user_id,body.campaign_id||null,total,fee,budget,"USD").run();
+    .bind(paymentId,body.user_id,body.campaign_id||null,fee,fee,budget,"USD").run();
   const params=new URLSearchParams();
   params.set("mode","payment");
   params.set("success_url",body.success_url||new URL("/?payment=success",body.origin||"https://nxt-ads.ezdevsupport.workers.dev").toString());
   params.set("cancel_url",body.cancel_url||new URL("/?payment=cancel",body.origin||"https://nxt-ads.ezdevsupport.workers.dev").toString());
   params.set("line_items[0][price_data][currency]","usd");
-  params.set("line_items[0][price_data][product_data][name]","NXT ADS Advertising Budget");
-  params.set("line_items[0][price_data][unit_amount]",String(budget));
-  params.set("line_items[0][price_data][product_data][description]","Advertising spend allocated to your connected ad account");
+  params.set("line_items[0][price_data][product_data][name]","NXT ADS Platform Fee");
+  params.set("line_items[0][price_data][product_data][description]",String(Math.round(Number(env.NXT_PLATFORM_FEE_BPS||1200)/100))+"% platform fee on planned advertising spend");
+  params.set("line_items[0][price_data][unit_amount]",String(fee));
   params.set("line_items[0][quantity]","1");
-  params.set("line_items[1][price_data][currency]","usd");
-  params.set("line_items[1][price_data][product_data][name]","NXT ADS Platform Fee");
-  params.set("line_items[1][price_data][unit_amount]",String(fee));
-  params.set("line_items[1][quantity]","1");
   params.set("metadata[payment_id]",paymentId);
   params.set("metadata[user_id]",body.user_id);
+  params.set("metadata[ad_budget_cents]",String(budget));
   if(body.campaign_id) params.set("metadata[campaign_id]",body.campaign_id);
   const r=await fetch("https://api.stripe.com/v1/checkout/sessions",{method:"POST",headers:{authorization:"Basic "+btoa(env.STRIPE_SECRET_KEY+":"),"content-type":"application/x-www-form-urlencoded"},body:params});
   const data=await r.json();
   if(!r.ok){await env.DB.prepare("UPDATE payments SET status='failed' WHERE id=?").bind(paymentId).run();throw new Error(data.error?.message||"Stripe checkout failed")}
   await env.DB.prepare("UPDATE payments SET provider_payment_id=? WHERE id=?").bind(data.id,paymentId).run();
-  return {url:data.url,session_id:data.id,payment_id:paymentId,budget_cents:budget,fee_cents:fee,total_cents:total};
+  return {url:data.url,session_id:data.id,payment_id:paymentId,ad_budget_cents:budget,fee_cents:fee,total_platform_charge_cents:fee};
 }
 async function stripeWebhook(request,env){
   if(!env.STRIPE_WEBHOOK_SECRET) return json({error:"Stripe webhook secret is not configured"},503);
