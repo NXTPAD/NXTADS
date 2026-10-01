@@ -156,7 +156,7 @@ async function discoverGoogleAccounts(user,env){
   return ids;
 }
 async function googleApi(path,access,env,body){
-  const headers={"content-type":"application/json","authorization:"+" Bearer "+access,"developer-token":env.GOOGLE_DEVELOPER_TOKEN};
+  const headers={"content-type":"application/json","authorization":"Bearer "+access,"developer-token":env.GOOGLE_DEVELOPER_TOKEN};
   if(env.GOOGLE_LOGIN_CUSTOMER_ID) headers["login-customer-id"]=String(env.GOOGLE_LOGIN_CUSTOMER_ID).replaceAll("-","");
   const r=await fetch("https://googleads.googleapis.com/v25"+path,{method:"POST",headers,body:JSON.stringify(body)});
   const data=await r.json(); if(!r.ok) throw new Error("Google Ads API "+r.status+": "+JSON.stringify(data).slice(0,900)); return data;
@@ -180,7 +180,7 @@ async function publishGoogleCampaign(user,campaign,ad,account,env){
   const finalUrl=campaign.website_url; if(!/^https?:\/\//i.test(finalUrl||"")) throw new Error("A valid campaign website URL is required");
   const adResp=await googleApi(`/customers/${cid}/adGroupAds:mutate`,access,env,{operations:[{create:{status:"PAUSED",adGroup:groupResource,ad:{finalUrls:[finalUrl],responsiveSearchAd:{headlines:[{text:headline},{text:second},{text:third}],descriptions:[{text:description},{text:(description+" "+second).slice(0,90)}]}}}}]});
   const keyword=((campaign.target_audience||campaign.name||"business").toLowerCase().replace(/[^a-z0-9 ]/g," ").trim().split(/\s+/).filter(Boolean).slice(0,4).join(" ")||"business");
-  await googleApi(`/customers/${cid}/adGroupCriteria:mutate`,access,env,{operations:[{create:{adGroup:groupResource,status:"PAUSED,keyword:{text:keyword,matchType:"BROAD"}}}]});
+  await googleApi(`/customers/${cid}/adGroupCriteria:mutate`,access,env,{operations:[{create:{adGroup:groupResource,status:"PAUSED",keyword:{text:keyword,matchType:"BROAD"}}}]});
   const externalId=campaignResource.split("/").pop();
   await env.DB.prepare("UPDATE campaigns SET status='connected',providers=? WHERE id=?").bind(JSON.stringify([{provider:"google",customer_id:cid,external_id:externalId}]),campaign.id).run();
   return {provider:"google",customer_id:cid,campaign_resource:campaignResource,ad_group_resource:groupResource};
