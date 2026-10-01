@@ -341,7 +341,7 @@ export default {
 
       if (path === "/api/campaigns" && request.method === "GET") {
         await requireDb(env);
-        const user=await requireUser(request,env); const r = await env.DB.prepare("SELECT * FROM campaigns WHERE user_id=? ORDER BY created_at DESC LIMIT 100").bind(user.id).all();
+        const user=await requireUser(request,env); const r = await env.DB.prepare("SELECT c.*, EXISTS(SELECT 1 FROM payments p WHERE p.campaign_id=c.id AND p.user_id=c.user_id AND p.status='paid') AS paid FROM campaigns c WHERE c.user_id=? ORDER BY c.created_at DESC LIMIT 100").bind(user.id).all();
         return json(r.results || []);
       }
 
