@@ -1,29 +1,53 @@
 # NXT ADS
 
-NXT ADS is a Cloudflare Workers advertising intelligence platform.
+NXT ADS is a Cloudflare Workers advertising intelligence platform for creating, managing, analyzing and optimizing paid advertising campaigns from one dashboard.
 
-## Stack
-- Cloudflare Workers + Static Assets
-- Cloudflare D1
-- GitHub Actions
-- AI provider API
-- Stripe Checkout
-- Google Ads / Microsoft Advertising / Meta / TikTok / LinkedIn adapters
+## Current architecture
+- Cloudflare Workers API/runtime
+- Cloudflare D1 for users, sessions, OAuth state, ad accounts, campaigns, creatives, payments and performance
+- GitHub source of truth
+- Responsive NXT ADS dashboard
+- NXT AI creative generation
+- Stripe Checkout + signed webhooks for NXT platform fees
+- AES-GCM encrypted advertising OAuth tokens
+- Google Ads OAuth, account discovery, token refresh, reporting and Search-campaign publishing
+- OAuth/provider framework for Microsoft Advertising, Meta Ads, TikTok Ads and LinkedIn Ads
 
-## Deploy
-1. Create a D1 database: `npx wrangler d1 create nxt-ads`
-2. Put its ID in `wrangler.toml`.
-3. Run `npx wrangler d1 migrations apply nxt-ads --remote`.
-4. Add secrets with `npx wrangler secret put NAME`.
-5. Run `npm install && npm run deploy`.
+## Business / billing model
 
-For GitHub Actions, add `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` repository secrets.
+The campaign budget is the customer's planned advertising spend. NXT does not treat that budget as NXT revenue.
 
-## Production API credentials
-Add the credentials supplied by each advertising provider as Worker Secrets. Never commit production keys to GitHub.
+NXT charges a configurable platform fee (currently 12%) through Stripe. The connected advertising network remains responsible for the customer's actual ad billing. This keeps NXT revenue, customer ad spend and provider billing separate.
 
-## Business model
-NXT_PLATFORM_FEE_BPS controls the NXT platform fee. 1200 = 12%. This value is configurable and should be reviewed against payment costs, network terms, taxes and applicable laws before production use.
+NXT_PLATFORM_FEE_BPS = 1200 means 12%.
 
-## Important
-Advertising network APIs require provider-specific app registration, OAuth approval, developer/API access and account permissions. The UI and server adapter architecture are prepared for those credentials; provider onboarding and approval cannot be completed by code alone.
+Stripe webhook events are verified before payment records are marked paid. Production campaign publishing requires a confirmed NXT platform-fee payment.
+
+## Security
+- AUTH_SECRET signs application sessions.
+- TOKEN_ENCRYPTION_KEY encrypts advertising OAuth access/refresh tokens before D1 storage.
+- OAuth state values expire after 10 minutes.
+- Production credentials are Worker Secrets, never GitHub files.
+- Campaign and payment APIs enforce user ownership when authentication is enabled.
+- Google Ads campaigns are created PAUSED so a user can review them before serving.
+
+## Deployment
+The repository contains a GitHub Actions deployment workflow that runs D1 migrations and deploys the Worker.
+
+Required GitHub repository secrets for Actions:
+- CLOUDFLARE_API_TOKEN
+- CLOUDFLARE_ACCOUNT_ID
+
+The internal Cloudflare secrets AUTH_SECRET and TOKEN_ENCRYPTION_KEY have already been generated and attached to the Worker.
+
+## Provider credentials
+Google Ads: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_DEVELOPER_TOKEN, optional GOOGLE_LOGIN_CUSTOMER_ID.
+Microsoft Advertising: MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET, MICROSOFT_DEVELOPER_TOKEN.
+Meta Ads: META_APP_ID, META_APP_SECRET.
+TikTok Ads: TIKTOK_CLIENT_KEY, TIKTOK_CLIENT_SECRET.
+LinkedIn Ads: LINKEDIN_CLIENT_ID, LINKEDIN_CLIENT_SECRET.
+Stripe: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET.
+NXT AI: AI_API_KEY, optional AI_API_URL and AI_MODEL.
+
+## Final provider onboarding
+Provider applications, developer tokens, API approval, OAuth redirect registration, ad-account permissions, Stripe activation and required business verification require access or approval outside the codebase. Those final steps must be completed by the platform owner.
