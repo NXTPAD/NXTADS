@@ -19,6 +19,14 @@ $("#createCampaign").onclick=async()=>{
 };
 async function loadCampaigns(){try{const r=await fetch("/api/campaigns");const d=await r.json();if(!Array.isArray(d))return;$("#campaignList").innerHTML=d.length?d.map(c=>`<div class="campaign-row"><div><b>${esc(c.name)}</b><small>${esc(c.objective)}</small></div><div><small>Budget</small><b>$${(c.budget_cents/100).toLocaleString()}</b></div><div><small>NXT fee</small><b>$${(c.fee_cents/100).toLocaleString()}</b></div><div><small>Status</small><b>${esc(c.status)}</b></div></div>`).join(""):'<div class="empty">No campaigns yet. Create your first campaign.</div>'}catch{$("#campaignList").innerHTML='<div class="empty">Connect D1 to load campaigns.</div>'}}
 async function loadProviders(){try{const r=await fetch("/api/providers");const d=await r.json();$("#providerGrid").innerHTML=d.providers.map(p=>`<div class="panel provider"><div class="provider-icon">◈</div><h3>${esc(p.name)}</h3><p>${p.configured?"Credentials detected and ready for OAuth.":"Add provider credentials in Cloudflare Secrets to enable this connection."}</p><button class="primary" data-provider="${p.id}">${p.configured?"Connect":"Configure"}</button></div>`).join("");$("[data-provider]").forEach(b=>b.onclick=()=>{const p=b.dataset.provider;if(p)location.href="/api/providers/"+p+"/connect"})}catch{}}
+async function loadAccounts(){
+  try{
+    const r=await fetch("/api/accounts"),d=await r.json();
+    const el=$("#accountList"); if(!el)return;
+    if(d.error && !(d.accounts||[]).length){el.innerHTML='<div class="empty">'+esc(d.error)+'</div>';return}
+    el.innerHTML=(d.accounts||[]).map(a=>'<div class="campaign-row"><div><b>'+esc(a.account_name||a.provider)+'</b><small>'+esc(a.provider.toUpperCase())+'</small></div><div><small>Account</small><b>'+esc(a.external_id||"—")+'</b></div><div><small>Status</small><b>'+esc(a.status)+'</b></div></div>').join("")||'<div class="empty">Connect an advertising network to see accounts here.</div>';
+  }catch(e){}
+}
 async function loadAuth(){
   try{
     const r=await fetch("/api/auth/me"); const d=await r.json();
@@ -32,4 +40,4 @@ async function loadAuth(){
   }catch(e){}
 }
 function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
-loadAuth();loadCampaigns();loadProviders();
+loadAuth();loadCampaigns();loadProviders();loadAccounts();
