@@ -4,14 +4,14 @@ export const PROVIDERS = {
     oauth: "https://accounts.google.com/o/oauth2/v2/auth",
     token: "https://oauth2.googleapis.com/token", clientIdSecret:"GOOGLE_CLIENT_ID", clientSecretSecret:"GOOGLE_CLIENT_SECRET",
     api: "https://googleads.googleapis.com",
-    scopes: ["https://www.googleapis.com/auth/adwords"]
+    scopes: ["openid","email","profile","https://www.googleapis.com/auth/adwords"]
   },
   microsoft: {
     name: "Microsoft Advertising",
     oauth: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
     token: "https://login.microsoftonline.com/common/oauth2/v2.0/token", clientIdSecret:"MICROSOFT_CLIENT_ID", clientSecretSecret:"MICROSOFT_CLIENT_SECRET",
     api: "https://campaign.api.bingads.microsoft.com",
-    scopes: ["https://ads.microsoft.com/msads.manage"]
+    scopes: ["openid","email","profile","offline_access","https://ads.microsoft.com/msads.manage"]
   },
   meta: {
     name: "Meta Ads",
