@@ -6,6 +6,13 @@ const json = (data, status=200) => new Response(JSON.stringify(data), {
 
 const id = (prefix="id") => prefix + "_" + crypto.randomUUID().replaceAll("-", "");
 
+async function requireUser(request, env) {
+  const user = await currentUser(request, env);
+  if (user) return user;
+  if (!env.AUTH_SECRET) return {id:"demo-user",email:"demo@nxtads.local",name:"Demo"};
+  throw new Error("Authentication required");
+}
+
 function feeFor(budgetCents, env) {
   const bps = Math.max(0, Number(env.NXT_PLATFORM_FEE_BPS || 1200));
   return Math.round(budgetCents * bps / 10000);
@@ -155,10 +162,11 @@ async function stripeCheckout(body, env) {
 
 async function dashboard(env) {
   await requireDb(env);
+  const user=await requireUser(request,env);
   const [campaigns, payments, perf] = await Promise.all([
-    env.DB.prepare("SELECT * FROM campaigns ORDER BY updated_at DESC LIMIT 8").all(),
-    env.DB.prepare("SELECT COALESCE(SUM(fee_cents),0) fee, COALESCE(SUM(amount_cents),0) gross FROM payments WHERE status='paid'").first(),
-    env.DB.prepare("SELECT COALESCE(SUM(spend_cents),0) spend, COALESCE(SUM(clicks),0) clicks, COALESCE(SUM(conversions),0) conversions, COALESCE(SUM(revenue_cents),0) revenue FROM performance_daily").first()
+    env.DB.prepare("SELECT * FROM campaigns WHERE user_id=? ORDER BY updated_at DESC LIMIT 8").bind(user.id).all(),
+    env.DB.prepare("SELECT COALESCE(SUM(fee_cents),0) fee, COALESCE(SUM(amount_cents),0) gross FROM payments WHERE status='paid' AND user_id=?").bind(user.id).first(),
+    env.DB.prepare("SELECT COALESCE(SUM(p.spend_cents),0) spend, COALESCE(SUM(p.clicks),0) clicks, COALESCE(SUM(p.conversions),0) conversions, COALESCE(SUM(p.revenue_cents),0) revenue FROM performance_daily p JOIN campaigns c ON c.id=p.campaign_id WHERE c.user_id=?").bind(user.id).first()
   ]);
   return { campaigns: campaigns.results || [], payments: payments || {}, performance: perf || {} };
 }
@@ -170,6 +178,13 @@ export default {
     try {
       if (path === "/api/health") return json({ ok:true, app:"NXT ADS", time:new Date().toISOString() });
       if (path === "/api/providers") return json({ providers: providerStatus(env) });
+      if (path === "/api/auth/:provider") { /* reserved */ }
+      const authMatch=path.match(/^\/api\/auth\/([a-z]+)$/);
+      if(authMatch && request.method==="GET" && PROVIDERS[authMatch[1]]) return await oauthStart(authMatch[1],"login",request,env);
+      const cbMatch=path.match(/^\/api\/oauth\/([a-z]+)\/callback$/);
+      if(cbMatch && request.method==="GET" && PROVIDERS[cbMatch[1]]) return await oauthCallback(cbMatch[1],request,env);
+      if(path==="/api/auth/me"){ await requireDb(env); const user=await currentUser(request,env); return json({authenticated:!!user,user:user?{id:user.id,email:user.email,name:user.name}:null}); }
+      if(path==="/api/auth/logout" && request.method==="POST"){ const h={"content-type":"application/json; charset=utf-8","set-cookie":"nxt_session=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0"}; return new Response(JSON.stringify({ok:true}),{headers:h}); }
 
       if (path === "/api/ai/generate" && request.method === "POST") {
         return json(await aiGenerate(await request.json(), env));
@@ -177,26 +192,28 @@ export default {
 
       if (path === "/api/billing/checkout" && request.method === "POST") {
         const body = await request.json();
+        const user=await requireUser(request,env);
         const amount = Math.max(100, Number(body.amount_cents || 0));
-        return json(await stripeCheckout({ ...body, amount_cents: amount }, env));
+        return json(await stripeCheckout({ ...body, amount_cents: amount, user_id:user.id }, env));
       }
 
       if (path === "/api/dashboard") return json(await dashboard(env));
 
       if (path === "/api/campaigns" && request.method === "GET") {
         await requireDb(env);
-        const r = await env.DB.prepare("SELECT * FROM campaigns ORDER BY created_at DESC LIMIT 100").all();
+        const user=await requireUser(request,env); const r = await env.DB.prepare("SELECT * FROM campaigns WHERE user_id=? ORDER BY created_at DESC LIMIT 100").bind(user.id).all();
         return json(r.results || []);
       }
 
       if (path === "/api/campaigns" && request.method === "POST") {
         await requireDb(env);
         const b = await request.json();
+        const user=await requireUser(request,env);
         const budget = Math.max(0, Number(b.budget_cents || 0));
         const campaignId = id("cmp");
         const fee = feeFor(budget, env);
         await env.DB.prepare(`INSERT INTO campaigns (id,user_id,name,objective,status,budget_cents,fee_cents,currency,start_date,end_date,providers,target_audience,website_url) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-          .bind(campaignId,b.user_id||"demo-user",b.name||"Untitled Campaign",b.objective||"sales","draft",budget,fee,"USD",b.start_date||null,b.end_date||null,JSON.stringify(b.providers||[]),b.audience||"",b.website_url||null).run();
+          .bind(campaignId,user.id,b.name||"Untitled Campaign",b.objective||"sales","draft",budget,fee,"USD",b.start_date||null,b.end_date||null,JSON.stringify(b.providers||[]),b.audience||"",b.website_url||null).run();
         return json({ id:campaignId, fee_cents:fee, total_cents:budget+fee });
       }
 
