@@ -160,7 +160,7 @@ async function stripeCheckout(body, env) {
   return { url: data.url, session_id: data.id };
 }
 
-async function dashboard(env) {
+async function dashboard(request, env) {
   await requireDb(env);
   const user=await requireUser(request,env);
   const [campaigns, payments, perf] = await Promise.all([
@@ -197,7 +197,7 @@ export default {
         return json(await stripeCheckout({ ...body, amount_cents: amount, user_id:user.id }, env));
       }
 
-      if (path === "/api/dashboard") return json(await dashboard(env));
+      if (path === "/api/dashboard") return json(await dashboard(request,env));
 
       if (path === "/api/campaigns" && request.method === "GET") {
         await requireDb(env);
