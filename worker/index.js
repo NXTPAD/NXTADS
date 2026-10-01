@@ -26,6 +26,7 @@ async function ensureSchema(env) {
   ]);
 }\n\nasync function requireDb(env) {
   if (!env.DB) throw new Error("D1 is not configured. Add a database binding in wrangler.toml.");
+  await ensureSchema(env);
 }
 
 async function aiGenerate(body, env) {
