@@ -1,4 +1,4 @@
-const $=s=>document.querySelector(s);const $=s=>[...document.querySelectorAll(s)];let connectedAccounts=[];
+const $=s=>document.querySelector(s);const $$=s=>[...document.querySelectorAll(s)];let connectedAccounts=[];
 function showPage(id){$$(".page").forEach(x=>x.classList.toggle("hidden",x.id!==id));$$(".nav").forEach(x=>x.classList.toggle("active",x.dataset.page===id));window.scrollTo({top:0,behavior:"smooth"})}
 $$(".nav").forEach(b=>b.onclick=()=>showPage(b.dataset.page));
 function modal(open){$("#modal").classList.toggle("hidden",!open)}
