@@ -24,7 +24,9 @@ async function ensureSchema(env) {
     env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_accounts_user ON ad_accounts(user_id)`),
     env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_perf_campaign_day ON performance_daily(campaign_id, day)`)
   ]);
-}\n\nasync function requireDb(env) {
+}
+
+async function requireDb(env) {
   if (!env.DB) throw new Error("D1 is not configured. Add a database binding in wrangler.toml.");
   await ensureSchema(env);
 }
