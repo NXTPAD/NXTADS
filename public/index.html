@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#07101b"><meta name="description" content="NXT ADS — AI-powered advertising intelligence and campaign management.">
+<title>NXT ADS — Marketing Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<div class="app">
+<aside class="sidebar">
+  <div class="brand"><div class="brandmark">N</div><div><b>NXT</b> <span>ADS</span></div></div>
+  <div class="workspace"><span class="dot"></span> Live workspace <span class="chev">⌄</span></div>
+  <nav>
+    <button class="nav active" data-page="intelligence"><span>◈</span> Intelligence</button>
+    <button class="nav" data-page="overview"><span>⌂</span> Overview</button>
+    <button class="nav" data-page="ads"><span>◉</span> Ads</button>
+    <button class="nav" data-page="campaigns"><span>◌</span> Campaigns</button>
+    <button class="nav" data-page="audience"><span>◎</span> Audience</button>
+    <button class="nav" data-page="attribution"><span>◍</span> Attribution</button>
+    <button class="nav" data-page="reports"><span>▤</span> Reports</button>
+    <button class="nav" data-page="alerts"><span>♢</span> Alerts</button>
+    <button class="nav" data-page="settings"><span>⚙</span> Settings</button>
+  </nav>
+  <div class="side-bottom"><div class="connection"><span class="dot"></span><div><strong>Connected</strong><small>All systems</small></div></div><div class="profile"><div class="avatar">NX</div><div><b>NXT Admin</b><small>Workspace owner</small></div><span>⌄</span></div></div>
+</aside>
+<main>
+<header><div><div class="eyebrow">NXT ADS / INTELLIGENCE</div><h1>Marketing Intelligence <span class="spark">✦</span></h1><p>AI-powered insights across every advertising touchpoint</p></div><div class="header-actions"><button class="range">Sep 01 — Oct 01 <span>⌄</span></button><button class="filter">⚱ Filters <span>⌄</span></button><button class="primary" id="newCampaign">+ New campaign</button></div></header>
+
+<section class="page" id="intelligence">
+<div class="cards">
+  <div class="metric"><div class="metric-top"><span class="icon blue">◉</span><div><b>Ads</b><small>Paid Performance</small></div></div><div class="metric-value">$128.4K <em>↗ 18.6%</em></div><small>Spend vs previous period</small><div class="mini"><span style="--h:38%"></span><span style="--h:44%"></span><span style="--h:40%"></span><span style="--h:55%"></span><span style="--h:48%"></span><span style="--h:67%"></span><span style="--h:60%"></span><span style="--h:82%"></span></div><div class="metric-foot"><div>ROAS <b>4.32</b></div><div>Conversions <b>2,842</b></div></div></div>
+  <div class="metric"><div class="metric-top"><span class="icon teal">♧</span><div><b>Reach</b><small>Engagement & Reach</small></div></div><div class="metric-value">2.7M <em>↗ 20.4%</em></div><small>Across connected channels</small><div class="mini teal"><span style="--h:45%"></span><span style="--h:55%"></span><span style="--h:49%"></span><span style="--h:70%"></span><span style="--h:58%"></span><span style="--h:78%"></span><span style="--h:69%"></span><span style="--h:88%"></span></div><div class="metric-foot"><div>Engagement <b>3.76%</b></div><div>Clicks <b>86.3K</b></div></div></div>
+  <div class="metric"><div class="metric-top"><span class="icon purple">◉</span><div><b>Web</b><small>Site Analytics</small></div></div><div class="metric-value">498.6K <em>↗ 16.8%</em></div><small>Sessions from paid channels</small><div class="mini purple"><span style="--h:36%"></span><span style="--h:50%"></span><span style="--h:45%"></span><span style="--h:63%"></span><span style="--h:55%"></span><span style="--h:75%"></span><span style="--h:66%"></span><span style="--h:84%"></span></div><div class="metric-foot"><div>Bounce <b>42.3%</b></div><div>Conversions <b>3,912</b></div></div></div>
+  <div class="metric"><div class="metric-top"><span class="icon orange">◎</span><div><b>Campaigns</b><small>Performance Summary</small></div></div><div class="metric-value">$1.28M <em>↗ 19.7%</em></div><small>Influenced revenue</small><div class="mini orange"><span style="--h:42%"></span><span style="--h:53%"></span><span style="--h:47%"></span><span style="--h:69%"></span><span style="--h:61%"></span><span style="--h:77%"></span><span style="--h:72%"></span><span style="--h:90%"></span></div><div class="metric-foot"><div>Pipeline <b>$2.94M</b></div><div>Win Rate <b>31.8%</b></div></div></div>
+</div>
+
+<div class="grid-main">
+<div class="panel chart-panel"><div class="panel-head"><div><h2>Performance Overview</h2><div class="legend"><span><i class="l-blue"></i>Revenue</span><span><i class="l-teal"></i>Conversions</span><span><i class="l-purple"></i>Sessions</span></div></div><div class="selects"><button>Daily ⌄</button><button>⟳ Compare</button></div></div><div class="chart"><div class="ylabels"><span>$200K</span><span>$150K</span><span>$100K</span><span>$50K</span><span>$0</span></div><svg viewBox="0 0 800 270" preserveAspectRatio="none"><g class="gridlines"><line x1="0" y1="20" x2="800" y2="20"/><line x1="0" y1="80" x2="800" y2="80"/><line x1="0" y1="140" x2="800" y2="140"/><line x1="0" y1="200" x2="800" y2="200"/><line x1="0" y1="260" x2="800" y2="260"/></g><path class="line blue-line" d="M0 196 C35 180,45 184,72 170 S118 122,150 145 S190 110,225 132 S270 98,305 121 S340 75,370 82 S405 112,440 87 S480 122,512 94 S548 70,578 88 S615 53,650 75 S690 112,720 84 S755 55,800 76"/><path class="line teal-line" d="M0 220 C35 205,45 214,72 195 S118 170,150 186 S190 155,225 176 S270 143,305 164 S340 126,370 142 S405 168,440 139 S480 177,512 145 S548 123,578 145 S615 115,650 136 S690 172,720 144 S755 110,800 132"/><path class="line purple-line" d="M0 236 C35 226,45 230,72 218 S118 205,150 214 S190 190,225 207 S270 185,305 198 S340 167,370 180 S405 202,440 178 S480 210,512 182 S548 162,578 184 S615 154,650 177 S690 200,720 181 S755 150,800 169"/></svg><div class="xlabels"><span>Sep 1</span><span>Sep 8</span><span>Sep 15</span><span>Sep 22</span><span>Sep 29</span></div></div><div class="panel-note">✦ Revenue and conversions are up <b>19.7%</b> compared with the previous period.</div></div>
+
+<div class="panel ai-panel"><div class="ai-title"><span>✦</span> AI Executive Readout</div><h3>Summary</h3><p>Performance is trending positively across connected channels. Paid media is producing the strongest direct-response signals while audience engagement continues to expand.</p><h3>Key Takeaways</h3><div class="take"><b>↗</b><div><strong>Paid ads ROAS improved 15.3%</strong><small>Efficiency is improving with creative refreshes.</small></div></div><div class="take"><b>◎</b><div><strong>Reach up 20.4%</strong><small>Audience growth is broadening across platforms.</small></div></div><div class="take"><b>◉</b><div><strong>Web conversions up 21.9%</strong><small>Top pages are producing more qualified traffic.</small></div></div><h3>AI Recommendations</h3><ul class="recommend"><li>Increase budget on top-performing ad sets.</li><li>Scale retargeting to capture high-intent traffic.</li><li>A/B test new landing-page variants.</li></ul><div class="confidence"><div><span>Confidence score</span><b>92%</b></div><div class="bar"><i></i></div></div></div>
+</div>
+
+<div class="grid-bottom"><div class="panel channel"><div class="panel-head"><h2>Channel Performance</h2><button>Conversions ⌄</button></div><div class="bars"><div><i style="height:94%"></i><b>3,842</b><span>Paid Ads</span></div><div><i style="height:98%"></i><b>3,912</b><span>Web</span></div><div><i style="height:61%"></i><b>2,437</b><span>Social</span></div><div><i style="height:30%"></i><b>1,208</b><span>Email</span></div><div><i style="height:21%"></i><b>842</b><span>Direct</span></div></div><div class="total"><span>Total Conversions</span><b>12,241</b><em>↗ 20.3%</em></div></div>
+<div class="panel campaigns"><div class="panel-head"><h2>Top Campaigns</h2><button>Revenue ⌄</button></div><table><thead><tr><th>Campaign</th><th>Revenue</th><th>ROAS</th><th>Trend</th></tr></thead><tbody><tr><td>Q2 Product Launch</td><td>$432,759</td><td>5.21</td><td class="trend">╱╲╱╲</td></tr><tr><td>Spring Promo</td><td>$286,593</td><td>4.18</td><td class="trend">╱╲╱╲</td></tr><tr><td>Brand Awareness</td><td>$176,982</td><td>2.91</td><td class="trend">╱╲╱╲</td></tr><tr><td>Retargeting Campaign</td><td>$146,325</td><td>6.23</td><td class="trend">╱╲╱╲</td></tr><tr><td>Email Nurture Series</td><td>$98,412</td><td>3.75</td><td class="trend">╱╲╱╲</td></tr></tbody></table><button class="link">View all campaigns →</button></div></div>
+</section>
+
+<section class="page hidden" id="ads"><div class="section-title"><div><div class="eyebrow">CREATIVE ENGINE</div><h2>AI Ad Studio</h2><p>Generate platform-ready creative in seconds.</p></div></div><div class="studio"><div class="panel form"><label>Business / product<input id="business" placeholder="e.g. Premium roofing company"></label><label>Offer<input id="offer" placeholder="e.g. Free inspection"></label><label>Audience<input id="audience" placeholder="e.g. Homeowners in Texas"></label><label>Objective<select id="objective"><option>Sales</option><option>Leads</option><option>Traffic</option><option>Awareness</option></select></label><button class="primary wide" id="generate">✦ Generate with NXT AI</button></div><div class="panel result"><div class="result-head"><span>AI Creative Preview</span><span class="status" id="aiStatus">Ready</span></div><div id="creative"><div class="empty">Your generated ads will appear here.</div></div></div></div></section>
+
+<section class="page hidden" id="campaigns"><div class="section-title"><div><div class="eyebrow">CAMPAIGN MANAGEMENT</div><h2>Campaigns</h2><p>Create, fund and monitor advertising campaigns.</p></div><button class="primary" id="newCampaign2">+ Create campaign</button></div><div class="panel"><div id="campaignList" class="campaign-list"><div class="empty">Loading campaigns…</div></div></div></section>
+
+<section class="page hidden" id="settings"><div class="section-title"><div><div class="eyebrow">PLATFORM</div><h2>Settings & Connections</h2><p>Connect advertising networks and manage your workspace.</p></div></div><div class="connection-grid" id="providerGrid"></div></section>
+<section class="page hidden" id="overview"><div class="section-title"><div><div class="eyebrow">OVERVIEW</div><h2>Business overview</h2><p>Your NXT ADS command center.</p></div></div><div class="quick-grid"><div class="panel big-stat"><span>Campaign spend</span><b>$128,400</b><em>↗ 18.6%</em></div><div class="panel big-stat"><span>NXT revenue</span><b>$15,408</b><em>↗ 18.6%</em></div><div class="panel big-stat"><span>ROAS</span><b>4.32×</b><em>↗ 15.3%</em></div></div></section>
+<section class="page hidden" id="audience"><div class="placeholder panel"><span>◎</span><h2>Audience Intelligence</h2><p>Audience segments, reach, frequency and AI targeting recommendations will live here.</p></div></section>
+<section class="page hidden" id="attribution"><div class="placeholder panel"><span>◍</span><h2>Attribution</h2><p>Cross-channel conversion paths and revenue attribution.</p></div></section>
+<section class="page hidden" id="reports"><div class="placeholder panel"><span>▤</span><h2>Reports</h2><p>Exportable campaign and financial reporting.</p></div></section>
+<section class="page hidden" id="alerts"><div class="placeholder panel"><span>♢</span><h2>Alerts</h2><p>Budget, performance and integration alerts.</p></div></section>
+</main></div>
+<div class="modal hidden" id="modal"><div class="modal-card"><button class="close" id="closeModal">×</button><div class="eyebrow">NEW CAMPAIGN</div><h2>Create campaign</h2><label>Campaign name<input id="cName" placeholder="Summer acquisition"></label><label>Budget (USD)<input id="cBudget" type="number" min="1" placeholder="1000"></label><label>Objective<select id="cObjective"><option>sales</option><option>leads</option><option>traffic</option><option>awareness</option></select></label><label>Website<input id="cUrl" placeholder="https://yourwebsite.com"></label><button class="primary wide" id="createCampaign">Create draft campaign</button><p id="modalMsg" class="muted"></p></div></div>
+<script src="/app.js"></script>
+</body></html>
