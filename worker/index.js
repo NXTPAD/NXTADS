@@ -362,6 +362,9 @@ export default {
         await requireDb(env); const user=await requireUser(request,env), cid=publishMatch[1], body=await request.json();
         const campaign=await env.DB.prepare("SELECT * FROM campaigns WHERE id=? AND user_id=?").bind(cid,user.id).first();
         if(!campaign) return json({error:"Campaign not found"},404);
+        if(!env.STRIPE_SECRET_KEY) return json({error:"Billing is not configured. Add STRIPE_SECRET_KEY before publishing paid campaigns."},503);
+        const paid=await env.DB.prepare("SELECT id FROM payments WHERE campaign_id=? AND user_id=? AND status='paid' ORDER BY created_at DESC LIMIT 1").bind(cid,user.id).first();
+        if(!paid) return json({error:"Pay the NXT platform fee before publishing this campaign."},402);
         const provider=body.provider||"google";
         if(provider!=="google") return json({error:"This provider adapter is being enabled next; campaign remains safely in draft."},501);
         const account=await env.DB.prepare("SELECT * FROM ad_accounts WHERE id=? AND user_id=? AND provider='google'").bind(body.ad_account_id,user.id).first();
