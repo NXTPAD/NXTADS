@@ -138,11 +138,22 @@ async function decryptToken(value,env){
   const plain=await crypto.subtle.decrypt({name:"AES-GCM",iv:unb64(iv64)},key,unb64(data64));
   return new TextDecoder().decode(plain);
 }
+async function getGoogleAccess(account,env){
+  let access=await decryptToken(account.access_token,env);
+  if(access && account.token_expires_at && new Date(account.token_expires_at).getTime()>Date.now()+60000) return access;
+  const refresh=await decryptToken(account.refresh_token,env);
+  if(!refresh) return access;
+  const r=await fetch("https://oauth2.googleapis.com/token",{method:"POST",headers:{"content-type":"application/x-www-form-urlencoded"},body:new URLSearchParams({client_id:env.GOOGLE_CLIENT_ID,client_secret:env.GOOGLE_CLIENT_SECRET,refresh_token:refresh,grant_type:"refresh_token"})});
+  const d=await r.json(); if(!r.ok) throw new Error("Google OAuth refresh failed: "+JSON.stringify(d).slice(0,500));
+  const stored=await encryptToken(d.access_token,env), expires=new Date(Date.now()+Number(d.expires_in||3600)*1000).toISOString();
+  await env.DB.prepare("UPDATE ad_accounts SET access_token=?,token_expires_at=? WHERE id=?").bind(stored,expires,account.id).run();
+  return d.access_token;
+}
 async function discoverGoogleAccounts(user,env){
   if(!env.GOOGLE_DEVELOPER_TOKEN) return [];
   const account=await env.DB.prepare("SELECT * FROM ad_accounts WHERE user_id=? AND provider='google' ORDER BY created_at DESC LIMIT 1").bind(user.id).first();
   if(!account) return [];
-  const access=await decryptToken(account.access_token,env);
+  const access=await getGoogleAccess(account,env);
   if(!access) return [];
   const r=await fetch("https://googleads.googleapis.com/v25/customers:listAccessibleCustomers",{headers:{authorization:"Bearer "+access,"developer-token":env.GOOGLE_DEVELOPER_TOKEN}});
   const data=await r.json();
@@ -186,6 +197,13 @@ async function publishGoogleCampaign(user,campaign,ad,account,env){
   await env.DB.prepare("UPDATE campaigns SET status='published',providers=? WHERE id=?").bind(JSON.stringify([{provider:"google",customer_id:cid,external_id:externalId}]),campaign.id).run();
   if(adResource) await env.DB.prepare("UPDATE ads SET external_id=?,status='published' WHERE id=?").bind(adResource,ad.id).run();
   return {provider:"google",customer_id:cid,campaign_resource:campaignResource,ad_group_resource:groupResource,ad_resource:adResource};
+}
+async function googlePerformance(account,env){
+  const access=await getGoogleAccess(account,env), cid=account.external_id;
+  const query="SELECT campaign.id,campaign.name,metrics.cost_micros,metrics.impressions,metrics.clicks,metrics.conversions,metrics.conversions_value FROM campaign WHERE segments.date DURING LAST_30_DAYS";
+  const r=await fetch("https://googleads.googleapis.com/v25/customers/"+cid+"/googleAds:searchStream",{method:"POST",headers:{"content-type":"application/json","authorization":"Bearer "+access,"developer-token":env.GOOGLE_DEVELOPER_TOKEN,...(env.GOOGLE_LOGIN_CUSTOMER_ID?{"login-customer-id":String(env.GOOGLE_LOGIN_CUSTOMER_ID).replaceAll("-","")}: {})},body:JSON.stringify({query})});
+  const d=await r.json(); if(!r.ok) throw new Error("Google Ads reporting failed: "+JSON.stringify(d).slice(0,700));
+  return d;
 }
 async function aiGenerate(body, env) {
   if (!env.AI_API_KEY) {
@@ -291,6 +309,14 @@ export default {
       if(authMatch && request.method==="GET" && PROVIDERS[authMatch[1]]) return await oauthStart(authMatch[1],"login",request,env);
       const cbMatch=path.match(/^\/api\/oauth\/([a-z]+)\/callback$/);
       if(cbMatch && request.method==="GET" && PROVIDERS[cbMatch[1]]) return await oauthCallback(cbMatch[1],request,env);
+      const perfMatch=path.match(/^\/api\/accounts\/([^/]+)\/performance$/);
+      if(perfMatch && request.method==="GET"){
+        await requireDb(env); const user=await requireUser(request,env);
+        const account=await env.DB.prepare("SELECT * FROM ad_accounts WHERE id=? AND user_id=?").bind(perfMatch[1],user.id).first();
+        if(!account) return json({error:"Account not found"},404);
+        if(account.provider!=="google") return json({error:"Reporting adapter not enabled for this provider yet"},501);
+        return json({provider:"google",data:await googlePerformance(account,env)});
+      }
       if(path==="/api/accounts" && request.method==="GET"){
         await requireDb(env); const user=await requireUser(request,env);
         try{await discoverGoogleAccounts(user,env)}catch(e){return json({accounts:[],error:e.message},502)}
