@@ -182,8 +182,10 @@ async function publishGoogleCampaign(user,campaign,ad,account,env){
   const keyword=((campaign.target_audience||campaign.name||"business").toLowerCase().replace(/[^a-z0-9 ]/g," ").trim().split(/\s+/).filter(Boolean).slice(0,4).join(" ")||"business");
   await googleApi(`/customers/${cid}/adGroupCriteria:mutate`,access,env,{operations:[{create:{adGroup:groupResource,status:"PAUSED",keyword:{text:keyword,matchType:"BROAD"}}}]});
   const externalId=campaignResource.split("/").pop();
-  await env.DB.prepare("UPDATE campaigns SET status='connected',providers=? WHERE id=?").bind(JSON.stringify([{provider:"google",customer_id:cid,external_id:externalId}]),campaign.id).run();
-  return {provider:"google",customer_id:cid,campaign_resource:campaignResource,ad_group_resource:groupResource};
+  const adResource=adResp.results?.[0]?.resourceName||null;
+  await env.DB.prepare("UPDATE campaigns SET status='published',providers=? WHERE id=?").bind(JSON.stringify([{provider:"google",customer_id:cid,external_id:externalId}]),campaign.id).run();
+  if(adResource) await env.DB.prepare("UPDATE ads SET external_id=?,status='published' WHERE id=?").bind(adResource,ad.id).run();
+  return {provider:"google",customer_id:cid,campaign_resource:campaignResource,ad_group_resource:groupResource,ad_resource:adResource};
 }
 async function aiGenerate(body, env) {
   if (!env.AI_API_KEY) {
