@@ -31,3 +31,7 @@ APP_NAME = "NXT ADS"
 # npx wrangler secret put TIKTOK_CLIENT_SECRET
 # npx wrangler secret put LINKEDIN_CLIENT_ID
 # npx wrangler secret put LINKEDIN_CLIENT_SECRET
+# Security / auth secrets
+# npx wrangler secret put AUTH_SECRET
+# npx wrangler secret put TOKEN_ENCRYPTION_KEY
+# npx wrangler secret put STRIPE_WEBHOOK_SECRET
